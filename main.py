@@ -1,5 +1,3 @@
-from Bio import SeqIO
-
 # record_dict =
 # print(record_dict["accessible13"])  # use any record ID
 
@@ -7,8 +5,11 @@ from Bio import SeqIO
 import sys
 import Bio
 from Bio import SeqIO, SeqFeature
-from Bio.SeqRecord import SeqRecord
 import os
+
+K_VALUE = 2
+FILE = "accessible.fasta"
+FASTA_FILE_PATH = os.path.abspath(FILE)
 
 def cal_kmers(s, k):
     count_kmers = {}
@@ -20,11 +21,10 @@ def cal_kmers(s, k):
             count_kmers[kmer] += 1
     return count_kmers
 
-from Bio import SeqIO
-
 kmers_list = []  # Setup an empty list
-for record in SeqIO.parse("Files/accessible.fasta", "fasta"):
-    kmers_list.append(cal_kmers(record.seq, 2))
+for record in SeqIO.parse(FASTA_FILE_PATH, "fasta"):
+    kmers_list.append(cal_kmers(record.seq, K_VALUE))
+
 
 print("Found %i entries" % len(kmers_list))
-print(kmers_list[0])
+print(kmers_list[3])
