@@ -10,9 +10,10 @@ from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from scipy.stats import randint
 import matplotlib.pyplot as plt
 import joblib
+import time
 
 # defined macros
-K_VALUE = 3
+K_VALUE = 2
 ACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("accessible.fasta")
 NOTACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("notaccessible.fasta")
 TEST_FASTA_FILE_PATH = os.path.abspath("test.fasta")
@@ -37,11 +38,14 @@ def train_model():
     kmers_list = []  
     for record in SeqIO.parse(ACCESSIBLE_FASTA_FILE_PATH, "fasta"):
         kmers_list.append(cal_kmers(record.seq, K_VALUE))
+    accessible_labels = [0] * len(kmers_list)
+
     MAX_LENGTH = 999999
     for record in SeqIO.parse(NOTACCESSIBLE_FASTA_FILE_PATH, "fasta"):
         kmers_list.append(cal_kmers(record.seq, K_VALUE))
         if len(kmers_list) > MAX_LENGTH:
             break
+    non_accessible_labels = [1] *(len(kmers_list) - len(accessible_labels))
 
     # Creating 2d matrix with kmer counts
     print("Creating 2d matrix with kmer counts...")
@@ -50,8 +54,6 @@ def train_model():
 
     # Creating approriate labels, 0 for accessible and 1 for not accessible
     print("Creating approriate labels, 0 for accessible and 1 for not accessible...")
-    accessible_labels = [0] * (47239)
-    non_accessible_labels = [1] * (len(kmers_list) - 47239)
     labels = accessible_labels + non_accessible_labels
 
     # Splitting the training data to training data and testing data to test accuracy
@@ -142,5 +144,8 @@ def predict_test(clf):
                     break
 
 if __name__ == "__main__":
+    time_start = time.time()
     clf = train_model()
     predict_test(clf)
+    time_elapsed = (time.time() - time_start) / 60
+    print(f"Program ran for {time_elapsed} minutes")
