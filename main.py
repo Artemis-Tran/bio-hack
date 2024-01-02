@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import joblib
 
 # defined macros
-K_VALUE = 2
+K_VALUE = 3
 ACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("accessible.fasta")
 NOTACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("notaccessible.fasta")
 TEST_FASTA_FILE_PATH = os.path.abspath("test.fasta")
@@ -32,7 +32,7 @@ def cal_kmers(s, k):
 
 ### TRAINING MODEL
 def train_model():
-
+    print("Training model...")
     #filling list with kmer calculations for each sequence
     kmers_list = []  
     for record in SeqIO.parse(ACCESSIBLE_FASTA_FILE_PATH, "fasta"):
@@ -44,22 +44,57 @@ def train_model():
             break
 
     # Creating 2d matrix with kmer counts
+    print("Creating 2d matrix with kmer counts...")
     matrix = pd.DataFrame(kmers_list)
     matrix.fillna(0, inplace=True)
 
     # Creating approriate labels, 0 for accessible and 1 for not accessible
+    print("Creating approriate labels, 0 for accessible and 1 for not accessible...")
     accessible_labels = [0] * (47239)
     non_accessible_labels = [1] * (len(kmers_list) - 47239)
     labels = accessible_labels + non_accessible_labels
 
     # Splitting the training data to training data and testing data to test accuracy
+    print("Splitting the training data to training data and testing data to test accuracy...")
     X_train, X_test, y_train, y_test = train_test_split(matrix, labels, test_size=0.2)
 
     # Initializing and fitting the random forest to the training data
-    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    print("Initializing and fitting the random forest to the training data...")
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+
+
+    # Number of trees in random forest
+    n_estimators = [int(x) for x in numpy.linspace(start = 200, stop = 2000, num = 10)]
+    # Number of features to consider at every split
+    max_features = ['auto', 'sqrt']
+    # Maximum number of levels in tree
+    max_depth = [int(x) for x in numpy.linspace(10, 110, num = 11)]
+    max_depth.append(None)
+    # Minimum number of samples required to split a node
+    min_samples_split = [2, 5, 10]
+    # Minimum number of samples required at each leaf node
+    min_samples_leaf = [1, 2, 4]
+    # Method of selecting samples for training each tree
+    bootstrap = [True, False]
+
+    # Create the random grid
+    random_grid = {'n_estimators': n_estimators,
+                'max_features': max_features,
+                'max_depth': max_depth,
+                'min_samples_split': min_samples_split,
+                'min_samples_leaf': min_samples_leaf,
+                'bootstrap': bootstrap}
+
+    # Random search of parameters, using 3 fold cross validation, 
+    # search across 100 different combinations, and use all available cores
+    clf = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=42, n_jobs = -1)
+
+
+    print("Fitting data...")
     clf.fit(X_train, y_train)
 
     # Making predictions on the testing set
+    print("Making predictions on the testing set...")
     y_pred = clf.predict(X_test)
 
     # Making confusion matrix png
@@ -88,7 +123,7 @@ def predict_test(clf):
         test_kmers_list.append(cal_kmers(record.seq, K_VALUE))
         test_sequence_ids.append(record.id)
 
-    # Create 2d matrix 
+    # Create 2D matrix 
     test_matrix = pd.DataFrame(test_kmers_list)
     test_matrix.fillna(0, inplace=True)
 
