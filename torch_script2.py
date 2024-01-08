@@ -19,7 +19,7 @@ TEST_FASTA_FILE_PATH = os.path.abspath("test.fasta")
 class sequence_model(nn.Module):
     def __init__(self):
         super().__init__()
-        self.layer_1 = nn.Linear(in_features=16+1, out_features=128)
+        self.layer_1 = nn.Linear(in_features=16, out_features=128)
         self.layer_2 = nn.Linear(in_features=128, out_features=128)
         self.layer_3 = nn.Linear(in_features=128, out_features=1)
         self.relu = nn.ReLU()
@@ -62,7 +62,7 @@ def prepare_data():
         gc_content = calculate_gc_content(str(record.seq))
         features = list(kmers.values()) + [gc_content]  # Combine kmer counts and gc content
         features_list.append(features)
-    accessible_labels = [0] * len(features_list)
+    accessible_labels = [1] * len(features_list)
 
     # Initialize non_accessible_labels empty list, to be filled after counting
     non_accessible_labels = []
@@ -76,7 +76,7 @@ def prepare_data():
         
         if len(features_list) > MAX_LENGTH:
             break
-    non_accessible_labels = [1] * (len(non_accessible_labels) - len(accessible_labels))
+    non_accessible_labels = [0] * (len(features_list) - len(accessible_labels))
 
 
     all_keys = sorted(set().union(*[d.keys() for d in kmers_list]))
@@ -177,7 +177,7 @@ def predict_test(model):
     with open(output_file, 'w') as file:
         count = 0
         for sequence_id, prediction in zip(test_sequence_ids, predictions):
-            if prediction[0] == 0:  # predicted as accessible
+            if prediction[0] == 1:  # predicted as accessible
                 file.write(f"{sequence_id}\n")
                 count += 1
                 if count >= 10000:
