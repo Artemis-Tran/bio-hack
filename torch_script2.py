@@ -7,21 +7,23 @@ import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
 from torch import nn
+import time
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 K_VALUE = 2
-MAX_LENGTH = 299999
+MAX_LENGTH = 399999
 ACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("accessible.fasta")
 NOTACCESSIBLE_FASTA_FILE_PATH = os.path.abspath("notaccessible.fasta")
 TEST_FASTA_FILE_PATH = os.path.abspath("test.fasta")
+HIDDEN_LAYER = 64
 
 # Class Model
 class sequence_model(nn.Module):
     def __init__(self):
         super().__init__()
-        self.layer_1 = nn.Linear(in_features=16, out_features=128)
-        self.layer_2 = nn.Linear(in_features=128, out_features=128)
-        self.layer_3 = nn.Linear(in_features=128, out_features=1)
+        self.layer_1 = nn.Linear(in_features=17, out_features=HIDDEN_LAYER)
+        self.layer_2 = nn.Linear(in_features=HIDDEN_LAYER, out_features=HIDDEN_LAYER)
+        self.layer_3 = nn.Linear(in_features=HIDDEN_LAYER, out_features=1)
         self.relu = nn.ReLU()
 
     def forward(self,x):
@@ -40,6 +42,8 @@ def cal_kmers(s, k):
             count_kmers[kmer] = 1
         else:
             count_kmers[kmer] += 1
+    gc_content = calculate_gc_content(str(s))
+    count_kmers["GC_Content"] = gc_content
     return count_kmers
 
 def accuracy_fn(y_true, y_pred):
@@ -54,30 +58,20 @@ def calculate_gc_content(seq):
 def prepare_data():
     print("Preparing Data...")
     #filling list with kmer calculations for each sequence
-    kmers_list = []  
-    features_list = []  
+    kmers_list = []    
     for record in SeqIO.parse(ACCESSIBLE_FASTA_FILE_PATH, "fasta"):
         kmers_list.append(cal_kmers(record.seq, K_VALUE))
-        kmers = cal_kmers(str(record.seq), K_VALUE)
-        gc_content = calculate_gc_content(str(record.seq))
-        features = list(kmers.values()) + [gc_content]  # Combine kmer counts and gc content
-        features_list.append(features)
-    accessible_labels = [1] * len(features_list)
+    accessible_labels = [1] * len(kmers_list)
 
     # Initialize non_accessible_labels empty list, to be filled after counting
     non_accessible_labels = []
     
     for record in SeqIO.parse(NOTACCESSIBLE_FASTA_FILE_PATH, "fasta"):
         kmers_list.append(cal_kmers(record.seq, K_VALUE))
-        kmers = cal_kmers(str(record.seq), K_VALUE)
-        gc_content = calculate_gc_content(str(record.seq))
-        features = list(kmers.values()) + [gc_content]  # Combine kmer counts and gc content
-        features_list.append(features)
         
-        if len(features_list) > MAX_LENGTH:
+        if len(kmers_list) > MAX_LENGTH:
             break
-    non_accessible_labels = [0] * (len(features_list) - len(accessible_labels))
-
+    non_accessible_labels = [0] * (len(kmers_list) - len(accessible_labels))
 
     all_keys = sorted(set().union(*[d.keys() for d in kmers_list]))
     ordered_kmers_list = [{key: d.get(key, 0) for key in all_keys} for d in kmers_list]
@@ -89,8 +83,6 @@ def prepare_data():
     print(matrix)
     X = torch.from_numpy(X).type(torch.float)
     y = torch.from_numpy(y).type(torch.float)
-    print(X)
-    print(y[:10])
     print(X.shape)
     print(y.shape)
     
@@ -100,13 +92,9 @@ def prepare_data():
     # Model to train
     model_0 = sequence_model().to(DEVICE)
     
-
     # Loss function and optimizer
     loss_fn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(params=model_0.parameters(), lr=0.01)
-
-    # logits -> prediction probablities -> prediction lablels
-    # y_pred_labels = torch.round(torch.sigmoid(model_0(X_test.to(DEVICE))))
 
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
@@ -155,6 +143,7 @@ def prepare_data():
     return model_0
 
 def predict_test(model):
+    print("Predicting tests...")
     test_kmers_list = []
     test_sequence_ids = []
     for record in SeqIO.parse(TEST_FASTA_FILE_PATH, "fasta"):
@@ -183,14 +172,13 @@ def predict_test(model):
                 if count >= 10000:
                     break
     return predictions
-
-    # Evaluation metric
     
-
 if __name__ == "__main__":
+    time_start = time.time()
     model = prepare_data()
     print(predict_test(model))
-
+    time_elapsed = (time.time() - time_start) / 60
+    print(f"Program ran for {time_elapsed} minutes")
 
 
 
